@@ -5,7 +5,7 @@ struct Polygon{T}
     points::Vector{Point{2,T}}
 end
 
-Polygon(points::AbstractArray{Point{N,T}}) where {N,T} = Polygon{T}(points)
+Polygon(points::AbstractArray{Point{2}}) = Polygon(points)
 
 Base.eltype(::Polygon{T}) where {T} = T
 
@@ -20,4 +20,3 @@ function Base.getindex(p::Polygon, ::Type{Segment}, i::Integer)
     end
 end
 Base.getindex(p::Polygon, ::Type{DirSegment}, i::Integer) = DirSegment(p[Segment, i])
-

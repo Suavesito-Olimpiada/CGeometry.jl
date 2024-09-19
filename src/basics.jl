@@ -14,7 +14,7 @@ include("basics/polygon.jl")
 
 include("basics/dcel_table.jl")
 
-export signapprox, orientation, isintersect
+export signapprox, orientation, isintersect, slope
 
 
 signapprox(x::Number; tol=0) = ifelse(x < -tol, -1, ifelse(x > tol, 1, 0))
@@ -33,6 +33,9 @@ LinearAlgebra.norm(s::Union{DirSegment,Segment}) = norm(s.p₁ - s.p₂)
 
 LinearAlgebra.cross(v₁::Vec{2}, v₂::Vec{2}) = v₁.x * v₂.y - v₁.y * v₂.x
 LinearAlgebra.cross(v₁::Vec{3}, v₂::Vec{3}) = v₁.coords × v₂.coords
+
+
+slope(s::Union{Segment,DirSegment}) = (s[1].y-s[2].y)/(s[1].x-s[2].x)
 
 
 # O(1) operations
@@ -88,9 +91,9 @@ Return the orientation of the point `p` respect to the directed segment `s`.
 "
        ^
       /
-   s /
+   s /     · p
     /
-   ·        · p
+   ·
 "
 ```
 
@@ -210,3 +213,19 @@ _onsegment(s::Union{Segment{2},DirSegment{2}}, p::Point{2}) =
     (min(s[1].x, s[2].x) ≤ p.x ≤ max(s[1].y, s[2].y))
 
 
+function isintersect(s₁::Union{Segment{2},DirSegment{2}}, r::Ray{2}; tol=0)
+    p₁ = r.point
+    xₘᵢₙ, xₘₐₓ, yₘᵢₙ, yₘₐₓ = extrema((p₁.x, s₁[1].x, s₁[2].x)), extrema((p₁.y, s₁[1].y, s₁[2].y))
+    l = √((xₘₐₓ - xₘᵢₙ)^2 + (yₘₐₓ - yₘᵢₙ)^2)
+    p₂ = r.point + l*r.vector
+    s₂ = DirSegment(p₁, p₂)
+    isintersect(s₁, s₂)
+end
+
+function isintersect(s₁::Union{Segment{2},DirSegment{2}}, r::Line{2}; tol=0)
+    p₁, p₂ = r.point, r.point+r.vector
+    s₂ = DirSegment(p₁, p₂)
+    d₁ = orientation(s₂, s₁[1]; tol)
+    d₂ = orientation(s₂, s₁[2]; tol)
+    return (Int(d₁)*Int(d₂) == -1)
+end

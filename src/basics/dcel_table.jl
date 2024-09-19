@@ -7,11 +7,11 @@ export DCEL,
     Vertex, VertexHandle,
     Halfedge, HalfedgeHandle,
     Face, FaceHandle,
-    nvertices, vertices,
+    nvertices, vertices, points,
     nsegments, segments,
-    nhalfedges, halfedges,
+    nedges, nhalfedges, halfedges,
     nfaces, faces,
-    point, segment, faces,
+    point, halfedge, halfedges, faces,
     segment, origin, vertex, face, prev, next, twin, facet,
     vertices, halfedges, segments,
     insertdiagonal!, updatefaces!, explode
@@ -27,7 +27,7 @@ export DCEL,
 #    [5] next: index on `halfedges` to the next half-edge
 #    [6] twin: index on `halfedges` to the twin half-edge !!! must be in the (2i - i&2)
 # - `faces` contains the indices for `halfedges` representing half-edges of the incident
-#   face, one half-edge for every independent facet. A last face if always kept as the
+#   face, one half-edge for every independent facet. A last face is always kept as the
 #   infinite (or exterior) face.
 #
 # ** NOTE: every negative index to `segments` means that the directed segment needs to be
@@ -113,18 +113,20 @@ Base.show(io::IO, face::FaceHandle{T}) where {T} = _show(io, face)
 
 # basics
 
+Base.eltype(::DCEL{T}) where T = T
+
 Base.getindex(dcel::DCEL, i) = i < 0 ? reverse(dcel.segments[-i]) : dcel.segments[i]
 Base.getindex(dcel::DCEL, ::Type{Vertex}, i) = VertexHandle(dcel, i)
 Base.getindex(dcel::DCEL, ::Type{Halfedge}, i) = HalfedgeHandle(dcel, i)
 Base.getindex(dcel::DCEL, ::Type{Face}, i) = FaceHandle(dcel, i)
 
-Base.getindex(h::VertexHandle, i) = h.dcel.vertices[h.i][i]
+Base.getindex(h::VertexHandle, j) = h.dcel.vertices[h.i][j]
 Base.getindex(h::VertexHandle) = h.dcel.vertices[h.i]
-Base.getindex(h::HalfedgeHandle, i) = h.dcel.halfedges[i][h.i]
+Base.getindex(h::HalfedgeHandle, j) = h.dcel.halfedges[j][h.i]
 Base.getindex(h::HalfedgeHandle) = ntuple(i -> h[i], 6)
 Base.getindex(h::FaceHandle) = h.i == 0 ? last(h.dcel.faces) : h.dcel.faces[h.i]
 
-Base.setindex!(h::HalfedgeHandle, v, i) = h.dcel.halfedges[i][h.i] = v
+Base.setindex!(h::HalfedgeHandle, v, j) = h.dcel.halfedges[j][h.i] = v
 
 function addhalfedge!(dcel::DCEL, h::NTuple{6, Int})
     for i in 1:6
@@ -135,10 +137,12 @@ end
 # dcel
 nvertices(dcel::DCEL) = length(dcel.vertices)
 vertices(dcel::DCEL) = map(i -> dcel[Vertex, i], eachindex(dcel.vertices))
+points(dcel::DCEL) = map(i -> point(dcel[Vertex, i]), eachindex(dcel.vertices))
 
 nsegments(dcel::DCEL) = length(dcel.segments)
 segments(dcel::DCEL) = copy(dcel.segments)
 
+nedges(dcel::DCEL) = nhalfedges(dcel) >> 1
 nhalfedges(dcel::DCEL) = length(dcel.halfedges[1])
 halfedges(dcel::DCEL) = map(i -> dcel[Halfedge, i], eachindex(dcel.halfedges[1]))
 
@@ -210,6 +214,7 @@ halfedges(h::FaceHandle) = map(i -> facet(Halfedge, h.dcel[Halfedge, i]), h[])
 segments(h::FaceHandle) = map(i -> segment.(Iterators.facet(Halfedge, h.dcel[Halfedge, i])), h[])
 
 
+# receives a polygon edges in order
 function DCEL(segments::AbstractVector{DirSegment{2,T}}) where {T}
     n = length(segments)
     vertices = [(i, [2i - 1, 2mod(i - 1, 1:n)]) for i in 1:n]
@@ -234,9 +239,10 @@ Lazy operations, similar to `Base.Iterators`.
 """
 module Iterators
 
-using ..DCELs: DCEL, Vertex, VertexHandle, Halfedge, HalfedgeHandle, Face, FaceHandle, FacetIterator, face, vertex, segment
+using ..DCELs: DCEL, Vertex, VertexHandle, Halfedge, HalfedgeHandle, Face, FaceHandle, FacetIterator, face, vertex, segment, point
 
 vertices(dcel::DCEL) = Base.Iterators.map(i -> dcel[Vertex, i], eachindex(dcel.vertices))
+points(dcel::DCEL) = Base.Iterators.map(i -> point(dcel[Vertex, i]), eachindex(dcel.vertices))
 segments(dcel::DCEL) = Base.Iterators.map(identity, dcel.segments)
 halfedges(dcel::DCEL) = Base.Iterators.map(i -> dcel[Halfedge, i], eachindex(dcel.halfedges[1]))
 faces(dcel::DCEL) = Base.Iterators.map(i -> dcel[Face, i], eachindex(dcel.faces))
@@ -311,6 +317,20 @@ function insertdiagonal!(e1::HalfedgeHandle{T}, e2::HalfedgeHandle{T}) where {T}
     e2[4] = nh + 1
     # return
     dcel[Halfedge, nh+1]
+end
+
+function Base.in(p::Point{2,T}, face::FaceHandle{T}) where {T}
+    cruses = 0
+    for facet in face
+        for hedge in facet
+            seg = segment(hedge)
+            seg = seg[1].y < seg[2].y ? seg : reverse(seg)
+            if seg[1].y < p.y < seg[2].y
+                cruses += clamp(Int(orientation(segment(hedge), p)), 0, 1)
+            end
+        end
+    end
+    isodd(cruses)
 end
 
 function updatefaces!(dcel::DCEL{T}) where {T}

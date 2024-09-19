@@ -5,11 +5,17 @@ using Base.Order
 
 export BSTree, find, value, nextnode, prevnode
 
-@enum Traverse begin
-    left = -1
-    self = 0
-    right = 1
+struct Traverse
+    type::Int8
+    function Traverse(n::T ) where {T<:Integer}
+        if n ∉ -1:1
+            throw(ArgumentError("Argument must be an element of the set {-1,0,1}."))
+        end
+    end
 end
+const left = Traverse(-1);
+const self = Traverse(0);
+const right = Traverse(1);
 
 @inline Base.:(~)(traverse::Traverse) = ifelse(traverse == left, right, ifelse(traverse == right, left, traverse))
 

@@ -3,7 +3,7 @@ using Base.Order
 using .BSTrees
 using .DCELs
 
-export makemonotone, makemonotone!, triangulatemonotone, triangulatemonotone!
+export makemonotone, makemonotone!, triangulatemonotone, triangulatemonotone!, tricolorvertices
 
 # the return is an `Int` with the following codes
 #
@@ -37,7 +37,6 @@ end
 
 function makemonotone!(dcel::DCEL{T}; tol=0, cb=nothing) where {T}
     Q = sort!(vertices(dcel); by=point)
-    # pks = pointkind.(Q; tol)
     o = Lt() do h1, h2
         h1 == h2 && return false
         e = segment(h2)
@@ -59,7 +58,6 @@ function makemonotone!(dcel::DCEL{T}; tol=0, cb=nothing) where {T}
     helper = Dict{HalfedgeHandle{T},Tuple{HalfedgeHandle{T},Int}}()
     while !isempty(Q)
         v = pop!(Q)
-        # pk = pop!(pks)
         pk = pointkind(v; tol)
         e = halfedges(v)[1]
         isnothing(cb) || cb(dcel, tree, helper, v, pk)
@@ -148,9 +146,9 @@ makemonotone(poly::Polygon{T}; tol=0, cb=nothing) where {T} = makemonotone!(DCEL
 
 
 function triangulatemonotone!(dcel::DCEL{T}, f=1; tol=0, cb=nothing) where {T}
-    fs = halfedges(dcel[Face, f])[1]
+    fs = first(halfedges(dcel[Face, f]))
     bot, top = argmin(origin, fs), argmax(origin, fs)
-    hedges = Vector{Tuple{HalfedgeHandle{T},Bool}}(undef, nhalfedges(dcel)>>1)
+    hedges = Vector{Tuple{HalfedgeHandle{T},Bool}}(undef, length(fs))
     p, n = prev(top), next(top)
     hedges[begin] = top, true # left
     hedges[end] = bot, false # right
@@ -193,7 +191,7 @@ function triangulatemonotone!(dcel::DCEL{T}, f=1; tol=0, cb=nothing) where {T}
             h, ht = pop!(stack)
             while true
                 v, vt = pop!(stack)
-                ori = orientation(origin(h), origin(ui), origin(v))
+                ori = orientation(origin(h), origin(ui), origin(v); tol)
                 if (st && ori == ClockWise) || (!st && ori == CounterClockWise)
                     push!(stack, (v, vt))
                     push!(stack, (h, ht))
@@ -206,16 +204,68 @@ function triangulatemonotone!(dcel::DCEL{T}, f=1; tol=0, cb=nothing) where {T}
                     ui = insertdiagonal!(ui, v)
                 end
                 h, ht = v, vt
+                if isempty(stack)
+                    push!(stack, (h, ht))
+                    push!(stack, (ui, uit))
+                    break
+                end
             end
         end
     end
-    pop!(stack)
-    un = hedges[end]
-    for i in 1:length(stack)-1
-        v, vt = pop!(stack)
-        un = insertdiagonal!(hedges[end], v)
+    un, unt = hedges[end]
+    for i in 2:length(stack)-1
+        v, vt = stack[i]
+        if vt # left
+            un = insertdiagonal!(un, v)
+        else # right
+            v = insertdiagonal!(v, un)
+        end
     end
     return dcel
 end
 
 triangulatemonotone(dcel::DCEL{T}, f=1; tol=0, cb=nothing) where {T} = triangulatemonotone!(deepcopy(dcel), f; tol, cb)
+
+function tricolorvertices(dcel::DCEL{T}) where {T}
+    # check that every face, except the last one (infinite or external face) has three halfedges
+    @assert all(
+        f -> length(first(DCELs.Iterators.halfedges(f))) == 3,
+        @view(faces(dcel)[begin:end-1])
+    ) "Face with more or less than 3 edges!"
+    fs = falses(nfaces(dcel)-1)
+    # colors of the vertices
+    vs = zeros(Int, nvertices(dcel))
+    # which face is next
+    backtrack = Vector{FaceHandle{T}}()
+    # first halfedge
+    h = halfedges(faces(dcel)[1])[1][1]
+    # draw the firsts two vertices
+    vs[vertex(h).i] = 1
+    vs[vertex(next(h)).i] = 2
+    # put the first face
+    push!(backtrack, face(h))
+    # the invariants in the code are that the current face will have at least two vertices
+    # set to some color (so it will be solvable), and every face already visited will be
+    # fully colored
+    while !isempty(backtrack)
+        f = pop!(backtrack)
+        fs[f.i] = true
+        h = first(first(DCELs.Iterators.halfedges(f)))
+        colors = MVector(false, false, false)
+        for _ in 1:3
+            colors .= false
+            vi = vertex(h).i
+            if vs[vi] == 0
+                colors[vs[vertex(prev(h)).i]] = true
+                colors[vs[vertex(next(h)).i]] = true
+                vs[vi] = findfirst(!, colors)
+            end
+            ft = face(twin(h))
+            if ft.i != 0 && !fs[ft.i]
+                push!(backtrack, ft)
+            end
+            h = next(h)
+        end
+    end
+    vs
+end

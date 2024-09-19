@@ -1,8 +1,8 @@
-export radialsort, radialsort!
+export radialsort, radialsort!, eulerschar
 
 # sorting points
 
-using Statistics, DataStructures
+using Statistics #, DataStructures
 
 Statistics.mean(points::AbstractArray{<:Point{2}}) = Point(Statistics.mean(p -> p.coords, points))
 Statistics.mean(points::AbstractArray{<:Vec{2}}) = Vec(Statistics.mean(p -> p.coords, points))
@@ -17,6 +17,9 @@ end
 
 radialsort(points, pivot=nothing) = radialsort!(copy(points), pivot)
 
-include("geometry/convex_hull.jl")
-include("geometry/partition.jl")
+eulerschar(dcel) = nvertices(dcel) - nedges(dcel) + nfaces(dcel)
 
+include("geometry/convex_hull.jl")
+include("geometry/triangulation.jl")
+# include("geometry/location.jl")
+include("geometry/voronoi.jl")

@@ -1,4 +1,14 @@
-export jarvismarch, quickhull, grahamscan
+using .DCELs
+
+export jarvismarch, quickhull, grahamscan, boundingbox
+
+function boundingbox(pts)
+    X = extrema(p->p.x, pts)
+    Y = extrema(p->p.y, pts)
+    return X, Y
+end
+
+boundingbox(dcel::DCEL) = boundingbox(DCELs.Iterators.points(dcel))
 
 # receives sorted points
 function _half_jarvismarch!(chull, spoints; cb=nothing, tol=0)
