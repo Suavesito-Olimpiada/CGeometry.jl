@@ -3,33 +3,43 @@ using .DCELs
 export jarvismarch, quickhull, grahamscan, boundingbox
 
 function boundingbox(pts)
-    X = extrema(p->p.x, pts)
-    Y = extrema(p->p.y, pts)
+    X = extrema(p -> p.x, pts)
+    Y = extrema(p -> p.y, pts)
     return X, Y
 end
 
 boundingbox(dcel::DCEL) = boundingbox(DCELs.Iterators.points(dcel))
 
-# receives sorted points
-function _half_jarvismarch!(chull, spoints; cb=nothing, tol=0)
-    npoints = length(spoints)
-    prev = 1
-    next = npoints
-    while prev != npoints
-        push!(chull, spoints[prev])
-        # we only need to check for those points _after_ the point where we are
-        for i ∈ prev+1:npoints
-            if !isnothing(cb)
-                cb(chull, spoints[prev], spoints[next], spoints[i])
+# receives points and extrema
+function _half_jarvismarch!(chull, points, ip, iq; cb = nothing, tol = 0)
+    prev = ip
+    next = iq
+    while prev != iq
+        push!(chull, points[prev])
+        for i in eachindex(points)
+            # the three are different
+            if i == prev || i == next || prev == next
+                continue
             end
-            ori = orientation(spoints[prev], spoints[next], spoints[i]; tol)
-            if ori == CounterClockWise || ori == Colinear
+            if !isnothing(cb)
+                cb(chull, points, prev, next, i)
+            end
+            ori = orientation(points[prev], points[next], points[i]; tol)
+            if ori == CounterClockWise
                 next = i
+            elseif ori == Colinear
+                # keep the furthest colinear point
+                n = norm(points[prev] - points[i])
+                m = norm(points[prev] - points[next])
+                if n > m
+                    next = i
+                end
             end
         end
         prev = next
-        next = npoints
+        next = iq
     end
+    return
 end
 
 @doc raw"""
@@ -51,7 +61,7 @@ Where
  1. `chull` is the collection of points already in the convex hull
  2. `prev` is the previous vertex in the convex hull
  3. `next` is the current best guess for vertex in the convex hull
- 4. `testing` is the current guess for the vertex in the convex hull
+ 4. `index` is the current vertex testing to be in the convex hull
 
 See also [`quickhull`](@ref), [`grahamscan`](@ref).
 
@@ -60,19 +70,19 @@ See also [`quickhull`](@ref), [`grahamscan`](@ref).
 ```julia-repl
 julia> points = [Point(rand(2)) for _ in 1:10^4];
 
-julia> chull = jarvismarch(points; cb=(c,p,n,t)->nothing, tol=sqrt(eps()));
+julia> chull = jarvismarch(points; cb=nothing, tol=sqrt(eps()));
 ```
 """
-function jarvismarch(points::AbstractArray{<:Union{Point{2},Vec{2}}}; cb=nothing, tol=0)
+function jarvismarch(points::AbstractArray{<:Union{Point{2}, Vec{2}}}; cb = nothing, tol = 0)
     if length(points) ≤ 3
         return radialsort(points)
     end
-    spoints = sort(points; by=p -> (p.x, -p.y))
+    _, ip = findmin(p -> (p.x, -p.y), points)
+    _, iq = findmax(p -> (p.x, -p.y), points)
     chull = eltype(points)[]
-    _half_jarvismarch!(chull, spoints; cb, tol)
-    reverse!(spoints)
-    _half_jarvismarch!(chull, spoints; cb, tol)
-    return chull
+    _half_jarvismarch!(chull, points, ip, iq; cb, tol)
+    _half_jarvismarch!(chull, points, iq, ip; cb, tol)
+    return Polygon(reverse!(chull))
 end
 
 
@@ -127,7 +137,7 @@ julia> points = [Point(rand(2)) for _ in 1:10^4];
 julia> chull = quickhull(points; cb=(f,l,r)->nothing, tol=sqrt(eps()));
 ```
 """
-function quickhull(points::AbstractArray{<:Union{Point{2},Vec{2}}}; cb=nothing, tol=0)
+function quickhull(points::AbstractArray{<:Union{Point{2}, Vec{2}}}; cb = nothing, tol = 0)
     if length(points) ≤ 3
         return radialsort(points)
     end
@@ -139,7 +149,7 @@ function quickhull(points::AbstractArray{<:Union{Point{2},Vec{2}}}; cb=nothing, 
     end
     Qa = _quickhalfhull(A, a, b; cb, tol)
     Qb = _quickhalfhull(B, b, a; cb, tol)
-    return [a] ∪ Qa ∪ [b] ∪ Qb
+    return Polygon(reverse!([a] ∪ Qa ∪ [b] ∪ Qb))
 end
 
 
@@ -155,15 +165,14 @@ $ConvexHull(points)$
 If the callback `cb` is different from `nothing` then it will be called on every
 iteration as follow
 
-    cb(chull, prev, next, testing)
+    cb(chull, pivot, points, index)
 
 Where
 
  1. `chull` is the collection of points already in the convex hull
- 2. `prev` is the previous vertex in the convex hull
- 3. `next` is the current best guess for vertex in the convex hull
- 4. `testing` is the current guess for the vertex in the convex hull
-    cb(chull, prev, next, testing)
+ 2. `pivot` is the y⁻-most, x⁻-most point of the original set
+ 3. `points` is the vertices considered to be in the convex hull
+ 4. `index` is the current veretex in points to be tested
 
 See also [`jarvismarch`](@ref), [`quickhull`](@ref).
 
@@ -172,26 +181,36 @@ See also [`jarvismarch`](@ref), [`quickhull`](@ref).
 ```julia-repl
 julia> points = [Point(rand(2)) for _ in 1:10^4];
 
-julia> chull = grahamscan(points; cb=(c,p,n,t)->nothing, tol=sqrt(eps()));
+julia> chull = grahamscan(points);
 ```
 """
-function grahamscan(points::AbstractArray{<:Union{Point{2},Vec{2}}}; cb=nothing, tol=0)
-    if length(points) ≤ 3
-        return radialsort(points)
+grahamscan(points::AbstractArray{<:Union{Point{2}, Vec{2}}}; cb = nothing, tol = 0) = grahamscan!(copy(points); cb, tol)
+function grahamscan!(points::AbstractArray{<:Union{Point{2}, Vec{2}}}; cb = nothing, tol = 0)
+    npoints = length(points)
+    if npoints ≤ 3
+        # sort in counter-clockwise order
+        pivot = mean(points)
+        return radialsort!(points; pivot)
     end
-    p = argmin(p -> (p.y, p.x), points)
-    spoints = radialsort(points, p)
-    spoints = spoints[filter(
-        i -> orientation(spoints[i-1], p, spoints[i]) != Colinear,
-        3:length(spoints)
-    )]
-    chull = [p, spoints[2]]
-    for i ∈ 3:length(spoints)
-        if orientation(chull[end], chull[end-1], spoints[i]) == ClockWise
-            push!(chull, spoints[i])
-        else
+    # find the y⁻-most, x⁻-most point (bottom-left)
+    pivot = argmin(p -> (p.x, -p.y), points)
+    ip = findfirst(==(pivot), points)
+    deleteat!(points, ip)
+    # sort by angle first and by reverse-norm second
+    radialsort!(points; pivot, direction = π, turn = ClockWise, revnorm = true)
+    # only kept the furthest (first) points if several have the same angle
+    unique!(p -> atan(-(p - pivot).y, -(p - pivot).x), points)
+    # the stack
+    chull = [pivot]
+    for i in eachindex(points)
+        p = points[i]
+        while length(chull) > 2 && orientation(p, chull[end - 1], chull[end]) != ClockWise
             pop!(chull)
         end
+        push!(chull, p)
+        if !isnothing(cb)
+            cb(chull, points, i)
+        end
     end
-    return chull
+    return Polygon(reverse!(chull))
 end

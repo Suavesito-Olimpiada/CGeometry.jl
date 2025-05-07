@@ -1,14 +1,16 @@
-@testset verbose=true "Convex Hull" begin
+@testset verbose = true "Convex Hull" begin
     points = Point.([[0.0, 0.0], [0.5, 0.0], [1.0, 0.0], [1.0, 0.5], [1.0, 1.0], [0.5, 1.0], [0.0, 1.0], [0.0, 0.5]])
-    chull = Point.([[0.0, 1.0], [1.0, 1.0], [1.0, 0.0], [0.0, 0.0]])
+    chull = Point.([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]])
 
-    @testset verbose=true "Jarvis March" begin
+    @testset verbose = true "Jarvis March" begin
         @test jarvismarch(points) == chull
     end
 
-    @testset verbose=true "Quick Hull" begin
+    @testset verbose = true "Quick Hull" begin
         @test quickhull(points) == chull
     end
+
+    @testset verbose = true "Graham Scan" begin
+        @test grahamscan(points) == chull
+    end
 end
-
-

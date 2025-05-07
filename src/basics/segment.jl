@@ -1,16 +1,16 @@
 export Segment
 
-struct Segment{N,T}
-    p₁::Point{N,T}
-    p₂::Point{N,T}
+struct Segment{N, T}
+    p₁::Point{N, T}
+    p₂::Point{N, T}
 end
 
-Segment(ds::Segment{N,T}) where {N,T} = Segment{N,T}(ds.p₁, ds.p₂)
+Segment(ds::Segment{N, T}) where {N, T} = Segment{N, T}(ds.p₁, ds.p₂)
 
-Base.eltype(::Segment{N,T}) where {N,T} = T
+Base.eltype(::Segment{N, T}) where {N, T} = T
 
 function Base.getindex(s::Segment, i::Integer)
-    if i == 1
+    return if i == 1
         s.p₁
     elseif i == 2
         s.p₂

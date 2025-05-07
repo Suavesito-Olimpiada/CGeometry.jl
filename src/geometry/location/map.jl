@@ -1,51 +1,49 @@
 using StaticArrays
 using StructArrays
 
-struct Trapezoid
+struct DataTrapezoid
     node::Int   # index to dag[node]
-    face::Int   # index to dcel[Face, face], or 0 for BB
     leftp::Int  # index to dcel[Vertex, leftp], or 0 for BB
     rightp::Int # index to dcel[Vertex, rightp], or 0 for BB
     bottom::Int # index to dcel[Halfedge, bottom], or 0 for BB
     top::Int    # index to dcel[Halfedge, top], or 0 for BB
     # order is left-bottom, left-top, right-bottom, right-top
-    neightbours::SVector{4,Int} # -1 for NA, 0 for BB
+    neightbours::SVector{4, Int} # -1 for NA, 0 for BB
 end
 
-struct Map <: AbstractVector{Trapezoid}
-    data::StructVector{Trapezoid,@NamedTuple{node::Vector{Int}, face::Vector{Int}, leftp::Vector{Int}, rightp::Vector{Int}, bottom::Vector{Int}, top::Vector{Int}, neightbours::Vector{SVector{4,Int}}},Int}
+DataTrapezoid(node) = Trapezoid(node, 0, 0, 0, 0, 0, @SVector[-1, -1, -1, -1])
+
+struct Map <: AbstractVector{DataTrapezoid}
+    data::StructVector{DataTrapezoid, @NamedTuple{node::Vector{Int}, leftp::Vector{Int}, rightp::Vector{Int}, bottom::Vector{Int}, top::Vector{Int}, neightbours::Vector{SVector{4, Int}}}, Int}
 end
 
-struct TrapezoidHandle
+struct Trapezoid
     map::Map
     i::Int
 end
 
-Map() = Map(StructVector{Trapezoid}((node=Int[], face=Int[], leftp=Int[], rightp=Int[], bottom=Int[], top=Int[], neightbours=SVector{4,Int}[])))
+Map() = Map(StructVector{DataTrapezoid}((node = Int[], leftp = Int[], rightp = Int[], bottom = Int[], top = Int[], neightbours = SVector{4, Int}[])))
 
 Base.size(map::Map) = size(map.data)
 
-Base.@propagate_inbounds function Base.setindex!(map::Map, i::Int, v::Union{Trapezoid,TrapezoidHandle})
+Base.@propagate_inbounds function Base.setindex!(map::Map, i::Int, v::Union{DataTrapezoid, Trapezoid})
     @boundscheck checkbounds(map.data, i)
     map.data.node[i] = v.node
-    map.data.face[i] = v.face
     map.data.leftp[i] = v.leftp
     map.data.rightp[i] = v.rightp
     map.data.bottom[i] = v.bottom
     map.data.top[i] = v.top
-    map.data.neightbours[i] = v.neightbours
+    return map.data.neightbours[i] = v.neightbours
 end
 
 Base.@propagate_inbounds function Base.getindex(map::Map, i::Int)
     @boundscheck checkbounds(map.data, i)
-    TrapezoidHandle(map, i)
+    return Trapezoid(map, i)
 end
 
-function Base.setproperty!(trapezoid::TrapezoidHandle, sym::Symbol)
-    if sym == :node
+function Base.setproperty!(trapezoid::Trapezoid, sym::Symbol)
+    return if sym == :node
         trapezoid.map.data[trapezoid.i].node
-    elseif sym == :face
-        trapezoid.map.data[trapezoid.i].face
     elseif sym == :leftp
         trapezoid.map.data[trapezoid.i].leftp
     elseif sym == :rightp
@@ -61,11 +59,9 @@ function Base.setproperty!(trapezoid::TrapezoidHandle, sym::Symbol)
     end
 end
 
-function Base.setproperty!(trapezoid::TrapezoidHandle, sym::Symbol, v)
-    if sym == :node
+function Base.setproperty!(trapezoid::Trapezoid, sym::Symbol, v)
+    return if sym == :node
         trapezoid.map.data.node[trapezoid.i] = v
-    elseif sym == :face
-        trapezoid.map.data.face[trapezoid.i] = v
     elseif sym == :leftp
         trapezoid.map.data.leftp[trapezoid.i] = v
     elseif sym == :rightp
@@ -79,4 +75,14 @@ function Base.setproperty!(trapezoid::TrapezoidHandle, sym::Symbol, v)
     else
         setfield!(trapezoid.map.data, sym, v)
     end
+end
+
+function Base.push!(map::Map, trapezoid::Trapezoid)
+    push!(map.data, trapezoid)
+    return map.data[end]
+end
+
+function Base.replace!(t1::Trapezoid, t2::Trapezoid)
+    t1.data[t1.i] = trapezoid
+    return t1
 end

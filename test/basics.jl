@@ -1,4 +1,4 @@
-@testset verbose=true "$T" for (T, TF64) in ((Point, PointF64), (Vec, VecF64))
+@testset verbose = true "$T" for (T, TF64) in ((Point, PointF64), (Vec, VecF64))
     p = T(1, 2, 3)
     pf = TF64(p)
 
@@ -10,7 +10,7 @@
     @test p.z == 3
 end
 
-@testset verbose=true "Point ↔ Vec" begin
+@testset verbose = true "Point ↔ Vec" begin
     p₁ = Point(1, 0)
     p₂ = Point(2, 0)
     v = Vec(1, 0)
@@ -25,7 +25,7 @@ end
     @test v - v == Vec(0, 0)
 end
 
-@testset verbose=true "$T" for T in (Segment, DirSegment)
+@testset verbose = true "$T" for T in (Segment, DirSegment)
     p₁ = Point(1, 0)
     p₂ = Point(0, 1)
     s = T(p₁, p₂)
@@ -36,7 +36,7 @@ end
     @test s[2] == s.p₂
 end
 
-@testset verbose=true "Segment ↔ DirSegment" begin
+@testset verbose = true "Segment ↔ DirSegment" begin
     p₁ = Point(1, 0)
     p₂ = Point(0, 1)
     s = Segment(p₁, p₂)
@@ -49,7 +49,7 @@ end
     @test reverse(s) == s
 end
 
-@testset verbose=true "Cross product" begin
+@testset verbose = true "Cross product" begin
     v₁ = Vec(1, 0)
     v₂ = Vec(0, 1)
 
@@ -58,8 +58,8 @@ end
     @test v₁ × v₁ == 0
 end
 
-@testset verbose=true "O(1) operations" begin
-    @testset verbose=true "Orientation angle" begin
+@testset verbose = true "O(1) operations" begin
+    @testset verbose = true "Orientation angle" begin
         p₀ = Point(0, 0)
         p₁ = Point(1, 2)
         p₂ = Point(2, 1)
@@ -68,14 +68,14 @@ end
         @test orientation(p₀, p₂, p₁) == CounterClockWise
     end
 
-    @testset verbose=true "Orientation segment-point" begin
+    @testset verbose = true "Orientation segment-point" begin
         s = DirSegment(Point(0, 0), Point(1, 2))
         p = Point(2, 1)
 
         @test orientation(s, p) == ClockWise
     end
 
-    @testset verbose=true "Orientation adjacent segments" begin
+    @testset verbose = true "Orientation adjacent segments" begin
         ds₁ = DirSegment(Point(0, 0), Point(1, 2))
         ds₂ = DirSegment(Point(0, 0), Point(2, 1))
         s₁ = Segment(Point(0, 0), Point(1, 2))
@@ -87,7 +87,7 @@ end
         @test orientation(s₂, s₁) == CounterClockWise
     end
 
-    @testset verbose=true "Intersection of segments" begin
+    @testset verbose = true "Intersection of segments" begin
         ds₁ = DirSegment(Point(0, 0), Point(2, 2))
         ds₂ = DirSegment(Point(0, 2), Point(2, 0))
         s₁ = Segment(Point(0, 0), Point(0, 1))

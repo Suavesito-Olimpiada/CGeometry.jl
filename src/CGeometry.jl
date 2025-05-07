@@ -6,18 +6,11 @@ using LinearAlgebra
 
 export Orientation, CounterClockWise, ClockWise, NoOrientation, Colinear
 
-struct Orientation
-    type::Int8
-    function Orientation(n::T ) where {T<:Integer}
-        if n ∉ -1:2
-            throw(ArgumentError("Argument must be an element of the set {-1,0,1,2}."))
-        end
-    end
+struct BrokenInvariant <: Exception
+    msg::String
 end
-const CounterClockWise = Orientation(-1);
-const Colinear = Orientation(0);
-const ClockWise = Orientation(1);
-const NoOrientation = Orientation(2);
+
+@enum Orientation::Int8 CounterClockWise = -1 Colinear = 0 ClockWise = 1 NoOrientation = 2
 
 include("basics.jl")
 include("utils.jl")

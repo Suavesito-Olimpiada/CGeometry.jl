@@ -7,15 +7,16 @@ export BSTree, find, value, nextnode, prevnode
 
 struct Traverse
     type::Int8
-    function Traverse(n::T ) where {T<:Integer}
+    function Traverse(n::T) where {T <: Integer}
         if n ∉ -1:1
             throw(ArgumentError("Argument must be an element of the set {-1,0,1}."))
         end
+        return new(n)
     end
 end
-const left = Traverse(-1);
-const self = Traverse(0);
-const right = Traverse(1);
+const left = Traverse(-1)
+const self = Traverse(0)
+const right = Traverse(1)
 
 @inline Base.:(~)(traverse::Traverse) = ifelse(traverse == left, right, ifelse(traverse == right, left, traverse))
 
@@ -40,7 +41,7 @@ balance(node::BSTreeNode) = height(node.right) - height(node.left)
 updateheight!(node::BSTreeNode) = (node.height = max(height(node.left), height(node.right)) + 1)
 
 @inline function Base.getindex(node::BSTreeNode, traverse::Traverse)
-    if traverse == self
+    return if traverse == self
         node
     elseif traverse == left
         node.left
@@ -50,20 +51,21 @@ updateheight!(node::BSTreeNode) = (node.height = max(height(node.left), height(n
 end
 
 @inline function Base.setindex!(node::BSTreeNode, child::BSTreeNode, traverse::Traverse)
-    if traverse == left
+    return if traverse == left
         node.left = child
     elseif traverse == right
         node.right = child
     else
-        throw(ArgumentError("$node[$traverse] = $child does not makes sense."))
+        throw(ArgumentError(lazy"$node[$traverse] = $child does not makes sense."))
     end
 end
 
-mutable struct BSTree{T,Ord<:Ordering}
+# AVL tree
+mutable struct BSTree{T, Ord <: Ordering}
     count::Int
     root::Union{BSTreeNode{T}, Nothing}
     o::Ord
-    BSTree{T}(;ord::Ord=Forward) where {T,Ord} = new{T,Ord}(0,nothing,ord)
+    BSTree{T}(; ord::Ord = Forward) where {T, Ord} = new{T, Ord}(0, nothing, ord)
 end
 
 height(tree::BSTree) = isempty(tree) ? 0 : height(tree.root)
@@ -91,7 +93,7 @@ end
 
 # left := prev, right := next
 function pathtonearest(node::BSTreeNode{T}, side::Traverse) where {T}
-    path = Vector{Tuple{BSTreeNode{T},Traverse}}(undef, height(node))
+    path = Vector{Tuple{BSTreeNode{T}, Traverse}}(undef, height(node))
     head = 0
     tr = side
     while height(node) != 0
@@ -136,7 +138,7 @@ find(tree::BSTree{T}, val::T) where {T} = findnode(tree.root, BSTreeNode{T}(val)
 
 Base.in(val::T, tree::BSTree{T}) where {T} = !isnothing(findnode(tree.root, BSTreeNode{T}(val), tree.o))
 
-findnode(tree::BSTree{T,Ord}, node::BSTreeNode{T}) where {T,Ord} = findnodepath(tree.root, node, tree.o)
+findnode(tree::BSTree{T, Ord}, node::BSTreeNode{T}) where {T, Ord} = findnodepath(tree.root, node, tree.o)
 function findnode(root::BSTreeNode{T}, node::BSTreeNode{T}, ord) where {T}
     next = root
     local traverse::Traverse
@@ -155,9 +157,9 @@ function findnode(root::BSTreeNode{T}, node::BSTreeNode{T}, ord) where {T}
     return traverse == self ? next : nothing
 end
 
-findnodepath(tree::BSTree{T,Ord}, node::BSTreeNode{T}) where {T,Ord} = findnodepath(tree.root, node, tree.o)
+findnodepath(tree::BSTree{T, Ord}, node::BSTreeNode{T}) where {T, Ord} = findnodepath(tree.root, node, tree.o)
 function findnodepath(root::BSTreeNode{T}, node::BSTreeNode{T}, ord) where {T}
-    path = Vector{Tuple{BSTreeNode{T},Traverse}}(undef, height(root))
+    path = Vector{Tuple{BSTreeNode{T}, Traverse}}(undef, height(root))
     head = 0
     next = root
     local traverse::Traverse
@@ -220,7 +222,7 @@ end
     return leaf
 end
 
-function insertnode!(tree::BSTree{T,Ord}, node::BSTreeNode{T}) where {T,Ord}
+function insertnode!(tree::BSTree{T, Ord}, node::BSTreeNode{T}) where {T, Ord}
     if isempty(tree)
         tree.root = initroot!(node)
         tree.count += 1
@@ -234,12 +236,12 @@ function insertnode!(tree::BSTree{T,Ord}, node::BSTreeNode{T}) where {T,Ord}
     child = node
     reverse!(path)
     # this loop goes from the parent of the new node to root
-    for i ∈ eachindex(path)
+    for i in eachindex(path)
         parent, trc = path[i] # _tr_averse to _c_hild
         parent[trc] = child
         updateheight!(parent)
         if abs(balance(parent)) > 1
-            trgc = path[i-1][2] # _tr_averse to _g_rand_c_hild
+            trgc = path[i - 1][2] # _tr_averse to _g_rand_c_hild
             child = fixrotate!(parent, trc, trgc)
         else
             child = parent
@@ -249,7 +251,7 @@ function insertnode!(tree::BSTree{T,Ord}, node::BSTreeNode{T}) where {T,Ord}
     return node
 end
 
-function deletenode!(tree::BSTree{T,Ord}, node::BSTreeNode{T}) where {T,Ord}
+function deletenode!(tree::BSTree{T, Ord}, node::BSTreeNode{T}) where {T, Ord}
     isempty(tree) && return
     path, eq = findnodepath(tree.root, node, tree.o)
     eq || throw(KeyError(value(node)))
@@ -258,7 +260,7 @@ function deletenode!(tree::BSTree{T,Ord}, node::BSTreeNode{T}) where {T,Ord}
     nch = nchildren(node)
     child = if nch == 2 # inside tree
         npath = pathtonearest(node, right)
-        pnext, trgc = npath[end-1]
+        pnext, trgc = npath[end - 1]
         next, trc = npath[end]
         prev = nearest(node, left)
         prev.right.right = next
@@ -266,7 +268,7 @@ function deletenode!(tree::BSTree{T,Ord}, node::BSTreeNode{T}) where {T,Ord}
         next.right = node.right
         next.left = node.left
         path[end] = (next, right)
-        append!(path, @view(npath[begin+1:end-1]))
+        append!(path, @view(npath[(begin + 1):(end - 1)]))
         updateheight!(pnext)
         updateheight!(next)
         pnext[trgc]
@@ -281,14 +283,14 @@ function deletenode!(tree::BSTree{T,Ord}, node::BSTreeNode{T}) where {T,Ord}
             pop!(path)
             nothing
         else
-            parent, ptr = path[end-1]
+            parent, ptr = path[end - 1]
             node[ptr][~ptr] = parent
             pop!(path)
             node[ptr]
         end
     end
     reverse!(path)
-    for i ∈ eachindex(path)
+    for i in eachindex(path)
         parent, trc = path[i] # _tr_averse to _c_hild
         parent[trc] = child
         updateheight!(parent)
@@ -304,44 +306,44 @@ function deletenode!(tree::BSTree{T,Ord}, node::BSTreeNode{T}) where {T,Ord}
     return node
 end
 
-Base.insert!(tree::BSTree{T,Ord}, val::T) where {T,Ord} = value(insertnode!(tree, BSTreeNode{T}(val)))
+Base.insert!(tree::BSTree{T, Ord}, val::T) where {T, Ord} = value(insertnode!(tree, BSTreeNode{T}(val)))
 
-Base.delete!(tree::BSTree{T,Ord}, val::T) where {T,Ord} = value(deletenode!(tree, BSTreeNode{T}(val)))
+Base.delete!(tree::BSTree{T, Ord}, val::T) where {T, Ord} = value(deletenode!(tree, BSTreeNode{T}(val)))
 
 function _print(io, node::BSTreeNode, height, deep, active, leaves)
     deep > height && return
-    node.height == 0 || _print(io, node.right, height, deep+1, active, leaves)
+    node.height == 0 || _print(io, node.right, height, deep + 1, active, leaves)
     if deep == 1
         println(io, "   ", node.value, "(", node.height, ")")
     else
         active[deep] = ~active[deep]
-        str = reduce((str, b) -> str*(b ? "|   " : "    "), active[begin:deep-1]; init="")
+        str = reduce((str, b) -> str * (b ? "|   " : "    "), active[begin:(deep - 1)]; init = "")
         if node.height != 0
-            println(io, str*"+-- ", node.value, "(", node.height, ")")
+            println(io, str * "+-- ", node.value, "(", node.height, ")")
         elseif leaves
-            println(io, str*"+-- ", node.left.value, ":", node.value, ":", node.right.value, "(", node.height, ")")
+            println(io, str * "+-- ", node.left.value, ":", node.value, ":", node.right.value, "(", node.height, ")")
         end
     end
-    node.height == 0 || _print(io, node.left, height, deep+1, active, leaves)
-    nothing
+    node.height == 0 || _print(io, node.left, height, deep + 1, active, leaves)
+    return nothing
 end
 
-printfull(node::BSTreeNode) = _print(stdout, node, node.height+1, 1, falses(node.height+1), true)
+printfull(node::BSTreeNode) = _print(stdout, node, node.height + 1, 1, falses(node.height + 1), true)
 
-printfull(tree::BSTree) = _print(stdout, tree.root, tree.root.height+1, 1, falses(tree.root.height+1), true)
+printfull(tree::BSTree) = _print(stdout, tree.root, tree.root.height + 1, 1, falses(tree.root.height + 1), true)
 
-function Base.show(io::IO, ::MIME"text/plain", tree::BSTree{T,Ord}) where {T,Ord}
+function Base.show(io::IO, ::MIME"text/plain", tree::BSTree{T, Ord}) where {T, Ord}
     summary(io, tree)
     println(io, " with ", tree.count, " elements")
     isempty(tree) || _print(io, tree.root, tree.root.height, 1, falses(tree.root.height), false)
-    nothing
+    return nothing
 end
 
 function Base.show(io::IO, ::MIME"text/plain", node::BSTreeNode{T}) where {T}
     summary(io, node)
     println(io, " with height ", node.height)
     _print(io, node, node.height, 1, falses(node.height), false)
-    nothing
+    return nothing
 end
 
 end
